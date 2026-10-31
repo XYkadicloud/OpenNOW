@@ -1,0 +1,63 @@
+name: build-installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/zh-fullscreen-controller
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-x64:
+    runs-on: windows-2025
+    defaults:
+      run:
+        working-directory: opennow-stable
+    env:
+      npm_config_audit: "false"
+      npm_config_fund: "false"
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: opennow-stable/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --progress=false
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build renderer/main
+        run: npm run build
+
+      - name: Setup Rust (for native streamer)
+        uses: dtolnay/rust-toolchain@stable
+        continue-on-error: true
+
+      - name: Build native streamer
+        continue-on-error: true
+        run: npm run native:build
+
+      - name: Ensure native output dir exists
+        shell: bash
+        working-directory: .
+        run: mkdir -p native/opennow-streamer/bin
+
+      - name: Package installer + portable
+        run: npx electron-builder --publish never --win nsis portable --x64
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenNOW-windows-x64-zh
+          path: opennow-stable/dist-release/*.exe
+          if-no-files-found: error
