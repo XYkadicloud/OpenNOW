@@ -452,6 +452,7 @@ async function createMainWindow(): Promise<void> {
     minWidth: 1024,
     minHeight: 680,
     autoHideMenuBar: true,
+    fullscreen: true,
     backgroundColor: "#0f172a",
     webPreferences: {
       preload: preloadPath,
