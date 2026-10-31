@@ -553,7 +553,7 @@ function buildSessionRequestBody(input: SessionCreateRequest, deviceHashId: stri
       clientVersion: "30.0",
       sdkVersion: "1.0",
       streamerVersion: 1,
-      clientPlatformName: "windows",
+      clientPlatformName: "browser",
       clientRequestMonitorSettings: [
         {
           monitorId: 0,
@@ -1313,7 +1313,7 @@ function buildClaimRequestBody(sessionId: string, appId: string, settings: Strea
       clientVersion: "30.0",
       deviceHashId: deviceId,
       internalTitle: null,
-      clientPlatformName: "windows",
+      clientPlatformName: "browser",
       metaData: [
         { key: "SubSessionId", value: subSessionId },
         { key: "wssignaling", value: "1" },

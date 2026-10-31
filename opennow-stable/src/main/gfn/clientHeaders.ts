@@ -2,7 +2,14 @@ import crypto from "node:crypto";
 
 export const GFN_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 NVIDIACEFClient/HEAD/debb5919f6 GFN-PC/2.0.80.173";
-export const GFN_CLIENT_VERSION = "2.0.80.173";
+
+// Since 2026-10-27 NVIDIA selects the rig's streamer from the CloudMatch request
+// identity. A native/classic identity gets a classic RTSP rig and never enters
+// WebRTC signaling (game launch fails / HTTP 400). The web client identifies as a
+// plain Chrome browser, so CloudMatch + claim requests must do the same.
+export const GFN_CLOUDMATCH_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36";
+export const GFN_CLIENT_VERSION = "2.0.89.154";
 export const LCARS_CLIENT_ID = "ec7e38d4-03af-4b58-b131-cfb0495903ab";
 
 export const GFN_PLAY_ORIGIN = "https://play.geforcenow.com";
@@ -130,14 +137,15 @@ function resolveCloudMatchIdentity(options: GfnCloudMatchHeadersOptions): { clie
 export function buildGfnCloudMatchHeaders(options: GfnCloudMatchHeadersOptions): Record<string, string> {
   const { clientId, deviceId } = resolveCloudMatchIdentity(options);
   const headers: Record<string, string> = {
-    "User-Agent": GFN_USER_AGENT,
+    "User-Agent": GFN_CLOUDMATCH_USER_AGENT,
     Authorization: gfnJwtAuthorization(options.token),
     "Content-Type": "application/json",
     "nv-browser-type": "CHROME",
     "nv-client-id": clientId,
-    "nv-client-streamer": "NVIDIA-CLASSIC",
-    "nv-client-type": "NATIVE",
+    "nv-client-streamer": "WEBRTC",
+    "nv-client-type": "BROWSER",
     "nv-client-version": GFN_CLIENT_VERSION,
+    "x-nv-client-identity": GFN_CLOUDMATCH_USER_AGENT,
     "nv-device-make": "UNKNOWN",
     "nv-device-model": "UNKNOWN",
     "nv-device-os": platformToGfnDeviceOs(),
@@ -157,15 +165,16 @@ export function buildGfnCloudMatchClaimHeaders(options: GfnCloudMatchHeadersOpti
   const { clientId, deviceId } = resolveCloudMatchIdentity(options);
 
   return {
-    "User-Agent": GFN_USER_AGENT,
+    "User-Agent": GFN_CLOUDMATCH_USER_AGENT,
     Authorization: gfnJwtAuthorization(options.token),
     "Content-Type": "application/json",
     Origin: GFN_PLAY_ORIGIN,
     Referer: GFN_PLAY_REFERER,
     "nv-client-id": clientId,
-    "nv-client-streamer": "NVIDIA-CLASSIC",
-    "nv-client-type": "NATIVE",
+    "nv-client-streamer": "WEBRTC",
+    "nv-client-type": "BROWSER",
     "nv-client-version": GFN_CLIENT_VERSION,
+    "x-nv-client-identity": GFN_CLOUDMATCH_USER_AGENT,
     "nv-device-os": platformToGfnDeviceOs(),
     "nv-device-type": "DESKTOP",
     "x-device-id": deviceId,
