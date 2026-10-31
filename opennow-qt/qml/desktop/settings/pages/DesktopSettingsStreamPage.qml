@@ -182,6 +182,16 @@ Column {
         width: parent.width; paperStyle: true
         DesktopSettingsSection { text: qsTr("SESSION") }
         DesktopSettingsRow {
+            width: parent.width; paperStyle: true; glyph: "monitor"; title: qsTr("Start in fullscreen")
+            description: qsTr("Open the window in fullscreen at launch. F11 toggles fullscreen at any time.")
+            DesktopSettingsToggle {
+                objectName: "startFullScreenToggle"
+                checked: page.settingsScreen.boolSetting("startFullScreen", true)
+                Accessible.name: qsTr("Start in fullscreen")
+                onValueChangedByUser: value => page.settingsScreen.setSetting("startFullScreen", value)
+            }
+        }
+        DesktopSettingsRow {
             width: parent.width; paperStyle: true; glyph: "monitor"; title: qsTr("Fullscreen when session is ready")
             description: qsTr("Automatically enter fullscreen when your session is ready. F11 toggles fullscreen during play.")
             DesktopSettingsToggle {

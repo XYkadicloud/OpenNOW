@@ -4181,5 +4181,9 @@
     "starting": "正在启动 Steam 商店会话…",
     "readyDescription": "使用你的持久化存储打开 %1 商店。",
     "staleAccount": "账户已变更。请刷新商店启动后重试。"
+  },
+  "startFullscreen": {
+    "title": "启动时全屏",
+    "description": "启动即以全屏打开窗口。任何时候都可以按 F11 切换全屏。"
   }
 }

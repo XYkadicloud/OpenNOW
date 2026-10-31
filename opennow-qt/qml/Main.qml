@@ -58,6 +58,7 @@ ApplicationWindow {
                 + " scope=" + (SmokeTestMode ? "acceptance" : "stream"))
     }
     property bool geometryRestored: false
+    property bool startupFullscreenApplied: false
     readonly property bool settingsLoaded: Object.keys(ShellStore.settings || {}).length > 0
     readonly property bool onboardingVisible: ShellStore.signedIn
         && !ShellStore.authRestorePending
@@ -409,6 +410,20 @@ ApplicationWindow {
             window.showMaximized()
         else
             window.showNormal()
+    }
+
+    function applyStartupFullscreen() {
+        if (window.startupFullscreenApplied)
+            return
+        window.startupFullscreenApplied = true
+        if (ShellStore.settings.startFullScreen === false)
+            return
+        if (window.visibility === ApplicationWindow.FullScreen)
+            return
+        if (window.activeRoute === "stream")
+            return
+        window.visibilityBeforeFullscreen = window.visibility
+        window.showFullScreen()
     }
 
     function toggleFullscreen() {
@@ -822,8 +837,10 @@ ApplicationWindow {
                 window.initializeStartupMode()
                 window.considerStartupLaunch()
                 window.syncInputOwnership()
-                if (window.geometryRestored || !ShellStore.settings.windowWidth)
+                if (window.geometryRestored || !ShellStore.settings.windowWidth) {
+                    window.applyStartupFullscreen()
                     return
+                }
                 const settings = ShellStore.settings
                 const hasPosition = typeof settings.windowX === "number"
                     && typeof settings.windowY === "number"
@@ -831,6 +848,7 @@ ApplicationWindow {
                     hasPosition ? settings.windowX : 0, hasPosition ? settings.windowY : 0,
                     Number(settings.windowWidth), Number(settings.windowHeight)), hasPosition)
                 window.geometryRestored = true
+                window.applyStartupFullscreen()
             }
         }
 
@@ -843,8 +861,9 @@ ApplicationWindow {
                 event.accepted = true
                 return
             }
-            if (event.key === Qt.Key_F11 && window.activeRoute === "stream"
-                    && (ShellStore.settings.shortcutToggleFullscreen ?? "F11") === "F11"
+            if (event.key === Qt.Key_F11
+                    && (window.activeRoute !== "stream"
+                        || (ShellStore.settings.shortcutToggleFullscreen ?? "F11") === "F11")
                     && (event.modifiers & (Qt.ControlModifier | Qt.ShiftModifier
                         | Qt.AltModifier | Qt.MetaModifier)) === Qt.NoModifier) {
                 window.toggleFullscreen()
