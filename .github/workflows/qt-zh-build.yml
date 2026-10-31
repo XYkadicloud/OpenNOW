@@ -1,0 +1,152 @@
+name: Qt ZH build (GitHub-hosted Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/qt-zh-1.0.3
+    paths:
+      - "locales/zh.json"
+      - ".github/workflows/qt-zh-build.yml"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  SDL_VERSION: release-3.2.20
+  OPENNOW_BUILD_VERSION: 1.0.3-zh.1
+  OPENNOW_UPDATE_PUBLIC_KEY: ""
+
+jobs:
+  windows-x64:
+    name: Package windows-x64 (zh)
+    runs-on: windows-latest
+    timeout-minutes: 350
+    env:
+      BUILD_PARALLEL: "4"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start Windows Media Foundation installation
+        shell: pwsh
+        run: .github/scripts/windows-media-foundation-background.ps1 Start
+
+      - name: Map stable Windows workspace
+        shell: pwsh
+        run: .github/scripts/map-windows-workspace.ps1
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Windows build tools
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Bound Windows Rust compilation
+        shell: pwsh
+        run: |
+          "CARGO_BUILD_JOBS=4" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $linker = Join-Path $env:VCToolsInstallDir "bin\Hostx64\x64\link.exe"
+          if (-not (Test-Path $linker)) { throw "The MSVC x64 linker is unavailable." }
+          "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=$linker" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install Windows LLVM
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          choco install llvm -y --no-progress
+          $llvmBin = Join-Path $env:ProgramFiles "LLVM\bin"
+          if (-not (Test-Path (Join-Path $llvmBin "clang.exe")) -or
+              -not (Test-Path (Join-Path $llvmBin "libclang.dll"))) {
+            throw "LLVM installation is missing libclang.dll"
+          }
+          $llvmBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "LIBCLANG_PATH=$llvmBin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.3"
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          modules: qtmultimedia qtshadertools
+          cache: true
+          cache-key-prefix: qt-target-windows-x64-zh
+
+      - name: Build and cache SDL3
+        uses: ./.github/actions/sdl3
+        with:
+          version: ${{ env.SDL_VERSION }}
+          target-arch: x64
+          parallel: 4
+
+      - name: Finish Windows Media Foundation installation
+        shell: pwsh
+        run: |
+          .github/scripts/windows-media-foundation-background.ps1 Wait
+          .github/scripts/ensure-windows-media-foundation.ps1
+
+      - name: Configure Qt release
+        shell: bash
+        run: |
+          cd /o
+          cmake -S opennow-qt -B build/opennow-qt-release \
+            -G "Ninja Multi-Config" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl \
+            -DOPENNOW_BUILD_VERSION="$OPENNOW_BUILD_VERSION" \
+            -DOPENNOW_UPDATE_ED25519_PUBLIC_KEY="$OPENNOW_UPDATE_PUBLIC_KEY" \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/SDL-install"
+
+      - name: Build Qt release
+        shell: bash
+        run: |
+          cd /o
+          cmake --build build/opennow-qt-release --config Release --parallel 4
+
+      - name: Create portable ZIP package
+        shell: bash
+        run: |
+          cd /o
+          mkdir -p build/qt-packages
+          cpack --config build/opennow-qt-release/CPackConfig.cmake \
+            -C Release -G "ZIP" -B build/qt-packages
+
+      - name: Install WiX Toolset
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          choco install wixtoolset --version=3.14.1.20250415 -y --no-progress
+          $wixBin = Join-Path ${env:ProgramFiles(x86)} "WiX Toolset v3.14/bin"
+          $wixBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Create MSI installer
+        shell: bash
+        continue-on-error: true
+        run: |
+          cd /o
+          cpack --config build/opennow-qt-release/CPackConfig.cmake \
+            -C Release -G "WIX" -B build/qt-packages
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          cd /o
+          ls -la build/qt-packages || true
+          mkdir -p "$GITHUB_WORKSPACE/artifacts"
+          cp build/qt-packages/*.zip "$GITHUB_WORKSPACE/artifacts/" 2>/dev/null || true
+          cp build/qt-packages/*.msi "$GITHUB_WORKSPACE/artifacts/" 2>/dev/null || true
+          ls -la "$GITHUB_WORKSPACE/artifacts"
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenNOW-Qt-1.0.3-zh-windows-x64
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 14
